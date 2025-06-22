@@ -1,4 +1,5 @@
-import os, uuid
+import os
+import uuid
 from django.conf import settings
 from django.shortcuts import render
 from .forms import UploadImageForm
@@ -13,25 +14,30 @@ def upscale_image(input_path, output_path):
     ], check=True)
 
 def index(request):
-    original_url = upscaled_url = None
+    upscaled_url = original_url = None
 
     if request.method == 'POST':
         form = UploadImageForm(request.POST, request.FILES)
         if form.is_valid():
-            img = form.cleaned_data['image']
+            uploaded_file = form.cleaned_data['image']
             filename = f"{uuid.uuid4()}.png"
             input_path = os.path.join(settings.MEDIA_ROOT, filename)
             output_filename = f"upscaled_{filename}"
             output_path = os.path.join(settings.MEDIA_ROOT, output_filename)
 
-            with open(input_path, 'wb+') as f:
-                for chunk in img.chunks():
-                    f.write(chunk)
+            # ✅ Save the uploaded image first
+            with open(input_path, 'wb+') as destination:
+                for chunk in uploaded_file.chunks():
+                    destination.write(chunk)
 
-            upscale_image(input_path, output_path)
+            # ✅ Now file is saved, so you can safely call upscale
+            try:
+                upscale_image(input_path, output_path)
+                original_url = settings.MEDIA_URL + filename
+                upscaled_url = settings.MEDIA_URL + output_filename
+            except subprocess.CalledProcessError:
+                upscaled_url = None  # Handle errors gracefully
 
-            original_url = settings.MEDIA_URL + filename
-            upscaled_url = settings.MEDIA_URL + output_filename
     else:
         form = UploadImageForm()
 
